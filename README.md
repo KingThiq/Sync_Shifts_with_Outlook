@@ -1,4 +1,6 @@
 # Sync_Shifts_with_Outlook
+If you are unable to access it any other way, you can download the .zip file and import as a solution in Power Automate. You MUST change connection references to your own!!!
+
 https://make.powerautomate.com/galleries/private/templates/76f3024e4d8c4992bb2a2b225dca3ba4
 
 This flow checks "Shifts" and creates events in Outlook/Teams Calendar to reflect schedule. This then can be easily synced to a number of other online calendar services! Configured for use by Five-Star A/V Employees at Montage Deer Valley. Flow is universal, so should work for anybody who runs it with correct permissions. If you would like to set this up for your team, give me a holler! Contact info in Publisher Description. 
