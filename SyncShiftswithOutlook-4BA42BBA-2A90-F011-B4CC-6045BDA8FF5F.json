@@ -1,0 +1,388 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_shifts_1": {
+        "api": {
+          "name": "shared_shifts"
+        },
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedshifts_b6cf1"
+        },
+        "runtimeSource": "invoker"
+      },
+      "shared_office365_2": {
+        "api": {
+          "name": "shared_office365"
+        },
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_2f112"
+        },
+        "runtimeSource": "invoker"
+      },
+      "shared_office365": {
+        "api": {
+          "name": "shared_office365"
+        },
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedoffice365_35ae9"
+        },
+        "runtimeSource": "invoker"
+      },
+      "shared_shifts": {
+        "api": {
+          "name": "shared_shifts"
+        },
+        "connection": {
+          "connectionReferenceLogicalName": "new_sharedshifts_7b5ec"
+        },
+        "runtimeSource": "invoker"
+      },
+      "shared_office365users-1": {
+        "api": {
+          "name": "shared_office365users"
+        },
+        "connection": {
+          "connectionReferenceLogicalName": "pv_sharedoffice365users_32113"
+        },
+        "runtimeSource": "invoker"
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "description": "Manually triggered. Could be automated (see more extensive version) or run at the request of power app or chat.",
+          "kind": "Button",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            }
+          },
+          "metadata": {
+            "operationMetadataId": "2837a25f-cab0-4be8-9423-7a6c04aa42de"
+          }
+        }
+      },
+      "actions": {
+        "Apply_to_each": {
+          "type": "Foreach",
+          "foreach": "@outputs('List_all_Shifts_from_my_teams')?['body/value']",
+          "actions": {
+            "Try": {
+              "type": "Scope",
+              "description": "Selects a shift from those returned. Cross-checks calendar for the same shift (identified by Shift ID [SHFT_########] in event notes), and if not found; creates an event with the shift information.\n\nConsidering feature to update shift if info is changed",
+              "actions": {
+                "Get_a_Shift": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "teamId": "@items('Apply_to_each')?['teamInfo/teamId']",
+                      "shiftId": "@items('Apply_to_each')?['id']"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_shifts",
+                      "operationId": "GetShift",
+                      "connectionName": "shared_shifts_1"
+                    }
+                  },
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs",
+                        "outputs"
+                      ]
+                    }
+                  },
+                  "metadata": {
+                    "operationMetadataId": "740a246c-bd1c-4598-9a13-d78383c24194"
+                  }
+                },
+                "Condition_-_Already_Exists": {
+                  "type": "If",
+                  "expression": {
+                    "or": [
+                      {
+                        "greaterOrEquals": [
+                          "@outputs('EventsWithID')",
+                          1
+                        ]
+                      }
+                    ]
+                  },
+                  "actions": {},
+                  "else": {
+                    "actions": {
+                      "Create_event_(V4)": {
+                        "type": "OpenApiConnection",
+                        "description": "Creates a calendar event using the start and end time from the 'Get a Shift' action for shared shifts.",
+                        "inputs": {
+                          "parameters": {
+                            "table": "@outputs('CID_1')",
+                            "item/subject": "@outputs('Get_a_Shift')?['body/sharedShift/displayName']",
+                            "item/start": "@formatDateTime(outputs('Get_a_Shift')?['body/sharedShift/startDateTime'], 'yyyy-MM-ddTHH:mm:ss.fffZ')",
+                            "item/end": "@formatDateTime(outputs('Get_a_Shift')?['body/sharedShift/endDateTime'], 'yyyy-MM-ddTHH:mm:ss.fffZ')",
+                            "item/timeZone": "(UTC-07:00) Mountain Time (US & Canada)",
+                            "item/body": "<p class=\"editor-paragraph\">@{outputs('Get_a_Shift')?['body/id']}</p>",
+                            "item/location": "9100 Marsac Ave, Park City, UT 84060",
+                            "item/reminderMinutesBeforeStart": 60,
+                            "item/isReminderOn": true
+                          },
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                            "operationId": "V4CalendarPostItem",
+                            "connectionName": "shared_office365_2"
+                          }
+                        },
+                        "runtimeConfiguration": {
+                          "secureData": {
+                            "properties": [
+                              "inputs",
+                              "outputs"
+                            ]
+                          }
+                        },
+                        "metadata": {
+                          "operationMetadataId": "7b0ffeb3-eb78-43ac-997b-a756c92629a0"
+                        }
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Check_Calendar_for_Shift": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "27dc2acf-4485-4813-84f1-594c3b0f2c29"
+                  }
+                },
+                "ShiftName": {
+                  "type": "Compose",
+                  "inputs": "@outputs('Get_a_Shift')?['body/sharedShift/displayName']",
+                  "runAfter": {
+                    "Get_a_Shift": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "da275dfb-48d8-4bf9-96ae-080bcb9a3f7c"
+                  }
+                },
+                "Check_Calendar_for_Shift": {
+                  "type": "Scope",
+                  "actions": {
+                    "Get_Existing_Events_(V4)_1": {
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "parameters": {
+                          "table": "@outputs('CID_1')",
+                          "$filter": "Subject eq '@{outputs('ShiftName')}'"
+                        },
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "operationId": "V4CalendarGetItems",
+                          "connectionName": "shared_office365"
+                        }
+                      },
+                      "runtimeConfiguration": {
+                        "secureData": {
+                          "properties": [
+                            "inputs",
+                            "outputs"
+                          ]
+                        }
+                      },
+                      "metadata": {
+                        "operationMetadataId": "32bb9e80-4caa-4995-ae42-9dc51f961ede"
+                      }
+                    },
+                    "SHFT_ID_Search": {
+                      "type": "Query",
+                      "inputs": {
+                        "from": "@outputs('Get_Existing_Events_(V4)_1')?['body/value']",
+                        "where": "@contains(item()?['body'],outputs('Get_a_Shift')?['body/id'])"
+                      },
+                      "runAfter": {
+                        "Get_Existing_Events_(V4)_1": [
+                          "Succeeded"
+                        ]
+                      },
+                      "metadata": {
+                        "operationMetadataId": "00e84370-1f9f-4520-85cd-80bac63740ee"
+                      }
+                    },
+                    "EventsWithID": {
+                      "type": "Compose",
+                      "inputs": "@length(body('SHFT_ID_Search'))",
+                      "runAfter": {
+                        "SHFT_ID_Search": [
+                          "Succeeded"
+                        ]
+                      },
+                      "metadata": {
+                        "operationMetadataId": "379c9b15-40ec-47bb-a6f0-70d8c2b5cc61"
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "ShiftName": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "70f86b01-02d5-43c0-9cf2-d333601da90d"
+                  }
+                }
+              },
+              "metadata": {
+                "operationMetadataId": "1625f129-d364-4729-9cf7-4e1d06f60b5d"
+              }
+            }
+          },
+          "runAfter": {
+            "List_all_Shifts_from_my_teams": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "b7093455-0b0a-420d-a34a-c1bf9ea2ac23"
+          }
+        },
+        "List_all_Shifts_from_my_teams": {
+          "type": "OpenApiConnection",
+          "description": "Filtered to only return shifts from the next two weeks (14 days) and if the User Display Name of whomever is executing the program.",
+          "inputs": {
+            "parameters": {
+              "startTime": "@utcNow()",
+              "endTime": "@addDays(utcNow(), 14)",
+              "assignedToUserName": "@outputs('Get_my_profile_(V2)')?['body/displayName']"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_shifts",
+              "operationId": "ListShiftsCrossTeam",
+              "connectionName": "shared_shifts"
+            }
+          },
+          "runAfter": {
+            "Get_CID_1": [
+              "Succeeded"
+            ]
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          },
+          "metadata": {
+            "operationMetadataId": "3df69d6c-b80d-4693-8647-c97b99a072dc"
+          }
+        },
+        "Get_my_profile_(V2)": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365users",
+              "operationId": "MyProfile_V2",
+              "connectionName": "shared_office365users-1"
+            }
+          },
+          "runAfter": {},
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          },
+          "metadata": {
+            "operationMetadataId": "3b3f3752-96ab-4377-9fb9-b99da8654242"
+          }
+        },
+        "Get_CID_1": {
+          "type": "Scope",
+          "description": "Get CID (Calendar Identification Number) by:\n1) Get all user's Calendars\n2) Search for one titled \"Calendar\". (This will not function if you rename your calendar from default)\n3) Create a variable called CID so we can reference it later. (may be redundant)",
+          "actions": {
+            "Get_calendars_(V2)_1": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                  "operationId": "CalendarGetTables_V2",
+                  "connectionName": "shared_office365_2"
+                }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "outputs"
+                  ]
+                }
+              },
+              "metadata": {
+                "operationMetadataId": "b7eb4c6d-ebbb-4f11-9055-f1e95908cee1"
+              }
+            },
+            "Filter_array_1": {
+              "type": "Query",
+              "description": "Get calendar named 'Calendar\". If you changed your calendar name from default, please update the value after the \"is equal to\" so it reflects the current calendar name.",
+              "inputs": {
+                "from": "@outputs('Get_calendars_(V2)_1')?['body/value']",
+                "where": "@equals(item()?['name'],'Calendar')"
+              },
+              "runAfter": {
+                "Get_calendars_(V2)_1": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "78fe7d1f-de4f-4f5a-b15c-773d71401dd8"
+              }
+            },
+            "CID_1": {
+              "type": "Compose",
+              "inputs": "@first(body('Filter_array_1'))?['id']",
+              "runAfter": {
+                "Filter_array_1": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "90847d9a-2615-4bc3-ac2e-2302c6c65f1d"
+              }
+            }
+          },
+          "runAfter": {
+            "Get_my_profile_(V2)": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "a89f6ccf-af32-4003-a543-532d18711b9c"
+          }
+        }
+      },
+      "outputs": {},
+      "description": "This flow checks \"Shifts\" and creates events in Outlook/Teams Calendar to reflect schedule. This then can be easily synced to a number of other online calendar services! \n\nConfigured for use by Five-Star A/V Employees at Montage Deer Valley. Flow is universal, so should work for anybody who runs it with correct permissions.\n\nIf you would like to set this up for your team, give me a holler! Contact info in Publisher Description.\n\nConnections and Uses:\n\n-Office365 Users: Used to determine your user ID and name so it can be passed into other functions. UserID is used to get calendars belonging to you and know which teams you're a part of. Name is used to filter shifts, so you don't have EVERYBODY's shift(s) on your calendar.\n\n-Office365 Outlook: Used to get calendar details and create events in \"Calendar\". If name is changed, you will need to edit the flow. See flow notes for details.\n\n-Shifts for Microsoft Teams: Used to request assigned shift info\n\nAll connections Inputs/Outputs are encrypted by default."
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
